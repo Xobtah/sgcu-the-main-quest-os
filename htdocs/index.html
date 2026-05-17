@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WorkstationOS</title>
+<title>questOS</title>
 <link rel="stylesheet" href="https://unpkg.com/xp.css">
 <style>
   html, body {
@@ -527,7 +527,7 @@
 </style>
 </head>
 <body>
-<h2 class="sr-only" style="position:absolute;left:-9999px">WorkstationOS desktop with restaurant picker, calendar, and radio apps in draggable windows.</h2>
+<h2 class="sr-only" style="position:absolute;left:-9999px">questOS desktop with restaurant picker, the quest log, and radio apps in draggable windows.</h2>
 
 <div id="desktop">
   <div id="icon-grid" role="list"></div>
@@ -535,7 +535,7 @@
 </div>
 
 <div id="start-menu" role="menu" aria-hidden="true">
-  <div id="start-menu-header">WorkstationOS</div>
+  <div id="start-menu-header">questOS</div>
   <div id="start-menu-items"></div>
 </div>
 
@@ -573,24 +573,38 @@ const APPS = [
     render: (body) => {
       body.style.padding = '0';
       body.innerHTML = `<iframe
-        src="https://sgarant.fr/main-quest.html"
+        src="https://lunch.the-main.quest/"
         style="width:100%;height:100%;border:0;display:block"
         title="The Lunch"></iframe>`;
     }
   },
   {
     id: 'calendar',
-    label: 'Team Calendar',
+    label: 'The Quest Log',
     width: 480, height: 420,
     icon: iconCalendar,
-    render: renderCalendar
+    // render: renderCalendar
+    render: (body) => {
+      body.style.padding = '0';
+      body.innerHTML = `<iframe
+        src="https://log.the-main.quest/"
+        style="width:100%;height:100%;border:0;display:block"
+        title="The Quest Log"></iframe>`;
+    }
   },
   {
     id: 'radio',
-    label: 'Web Radio',
+    label: 'Radio',
     width: 360, height: 340,
     icon: iconRadio,
-    render: renderRadio
+    // render: renderRadio
+    render: (body) => {
+      body.style.padding = '0';
+      body.innerHTML = `<iframe
+        src="https://radio.the-main.quest/"
+        style="width:100%;height:100%;border:0;display:block"
+        title="SGarant FM"></iframe>`;
+    }
   }
 ];
 
@@ -989,12 +1003,12 @@ function iconRadio() {
 function renderWelcome(body, app) {
   body.innerHTML = `
     <div class="welcome-content">
-      <h2>Welcome to WorkstationOS</h2>
+      <h2>Welcome to questOS</h2>
       <p>This is the landing page for our team's internal apps. Double-click an icon on the desktop to open an app, or use the <b>start</b> menu.</p>
       <ul>
-        <li><b>Lunch Picker</b> — browse restaurants near the office and vote</li>
-        <li><b>Team Calendar</b> — upcoming team events</li>
-        <li><b>Web Radio</b> — what's playing right now, request a track, skip</li>
+        <li><b>The Lunch</b> — browse restaurants near the office and vote</li>
+        <li><b>The Quest Log</b> — upcoming team events</li>
+        <li><b>Radio</b> — what's playing right now on SGarant FM, request a track, skip</li>
       </ul>
       <p style="margin-top:14px"><i>Tip: try minimizing, maximizing, dragging windows around, and stacking them.</i></p>
       <div style="text-align:right;margin-top:14px">
