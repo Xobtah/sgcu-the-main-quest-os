@@ -1,0 +1,14 @@
+services:
+  os:
+    image: httpd:2.4
+    container_name: os
+    volumes:
+      - ./htdocs:/usr/local/apache2/htdocs:ro
+      - ./my-httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    restart: unless-stopped
+    networks:
+      - web
+
+# networks:
+#   web:
+#     external: true

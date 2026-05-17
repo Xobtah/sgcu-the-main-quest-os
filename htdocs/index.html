@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WorkstationOS</title>
+<link rel="stylesheet" href="https://unpkg.com/xp.css">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Pixelated MS Sans Serif", Arial, sans-serif;
+    user-select: none;
+  }
+
+  /* ---- Desktop background: Spencer DeMera's "Rolling green hills" via Unsplash ---- */
+  /* Photo: https://unsplash.com/photos/q0lB6w0z6Ns — free for commercial use under Unsplash License */
+  #desktop {
+    position: absolute;
+    inset: 0;
+    background-color: #6fa6e3; /* fallback while image loads */
+    background-image: url("https://images.unsplash.com/photo-1743220879914-14adc4afdaa3?auto=format&fit=crop&w=1920&q=80");
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+  }
+
+  /* ---- Desktop icons grid ---- */
+  #icon-grid {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: grid;
+    grid-template-columns: 88px;
+    gap: 12px;
+    z-index: 1;
+  }
+  .desktop-icon {
+    width: 88px;
+    padding: 6px 4px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px dotted transparent;
+  }
+  .desktop-icon:focus,
+  .desktop-icon.selected {
+    background: rgba(0, 50, 150, 0.35);
+    border: 1px dotted #fff;
+  }
+  .desktop-icon .icon-art {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 4px;
+    display: block;
+  }
+  .desktop-icon .icon-label {
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.2;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.7);
+    word-break: break-word;
+  }
+
+  /* ---- Window layer ---- */
+  #window-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none; /* windows themselves re-enable pointer events */
+  }
+  .os-window {
+    position: absolute;
+    pointer-events: auto;
+    min-width: 320px;
+    min-height: 220px;
+    background: #ece9d8;
+    border: 1px solid #003c74;
+    border-top: none;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+  }
+  .os-window.minimized {
+    display: none;
+  }
+
+  /* ---- Custom title bar (overrides xp.css) ---- */
+  .os-window .title-bar {
+    height: 28px;
+    flex: 0 0 28px;
+    padding: 0 4px 0 6px;
+    background: linear-gradient(
+      to bottom,
+      #0058e6 0%,
+      #2787ee 4%,
+      #2c8ef0 8%,
+      #2884ed 18%,
+      #1769dc 90%,
+      #0958d3 100%);
+    border-radius: 7px 7px 0 0;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    cursor: grab;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  }
+  .os-window .title-bar:active { cursor: grabbing; }
+  .os-window.inactive .title-bar {
+    background: linear-gradient(
+      to bottom,
+      #7a96df 0%,
+      #98b2e6 6%,
+      #a8c0eb 100%);
+    color: #d8dfee;
+  }
+  .os-window .title-bar-text {
+    flex: 1;
+    font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+    font-weight: bold;
+    font-size: 13px;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.45);
+    padding-left: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---- Action buttons: real, visible, with glyphs ---- */
+  .os-window .title-bar-controls {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+  .os-window .title-bar-controls button {
+    all: unset;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #003c74;
+    border-radius: 3px;
+    background: linear-gradient(to bottom, #5e9bf0 0%, #2c7be8 50%, #1e63cc 100%);
+    color: #fff;
+    font-family: "Marlett", "Arial", sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.4);
+    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  .os-window .title-bar-controls button:hover {
+    background: linear-gradient(to bottom, #7eb6ff 0%, #4a96f0 50%, #2c7bd9 100%);
+  }
+  .os-window .title-bar-controls button:active {
+    background: linear-gradient(to bottom, #1e63cc 0%, #2c7be8 50%, #5e9bf0 100%);
+    box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .os-window .title-bar-controls button[data-action="close"] {
+    background: linear-gradient(to bottom, #e87356 0%, #d84020 50%, #b02810 100%);
+    border-color: #6c1a08;
+  }
+  .os-window .title-bar-controls button[data-action="close"]:hover {
+    background: linear-gradient(to bottom, #ff8e6e 0%, #ee5530 50%, #c93418 100%);
+  }
+  .os-window.inactive .title-bar-controls button {
+    background: linear-gradient(to bottom, #b6c4ea 0%, #98b0d8 100%);
+    border-color: #6a7fb0;
+  }
+
+  .os-window .window-body {
+    flex: 1;
+    overflow: auto;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 8px;
+    background: #ece9d8;
+    border: 1px solid #003c74;
+    border-top: none;
+    border-bottom: none;
+    border-radius: 0;
+    min-height: 0;
+  }
+  .os-window:not(.maximized) .window-body {
+    border-bottom: 0;
+  }
+
+  /* ---- Resize handles ---- */
+  .resize-handle {
+    position: absolute;
+    z-index: 2;
+  }
+  .resize-handle.n  { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+  .resize-handle.s  { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+  .resize-handle.e  { top: 8px; bottom: 8px; right: -3px; width: 6px; cursor: ew-resize; }
+  .resize-handle.w  { top: 8px; bottom: 8px; left: -3px; width: 6px; cursor: ew-resize; }
+  .resize-handle.ne { top: -3px; right: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+  .resize-handle.nw { top: -3px; left: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+  .resize-handle.se { bottom: -3px; right: -3px; width: 14px; height: 14px; cursor: nwse-resize; }
+  .resize-handle.sw { bottom: -3px; left: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+
+  /* Subtle visual hint on the SE corner — the classic XP grip dots */
+  .resize-handle.se::after {
+    content: "";
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 10px;
+    height: 10px;
+    background-image:
+      radial-gradient(circle, #888 1px, transparent 1.5px),
+      radial-gradient(circle, #fff 1px, transparent 1.5px);
+    background-size: 4px 4px;
+    background-position: 0 0, 1px 1px;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .os-window.maximized .resize-handle { display: none; }
+
+  /* ---- Taskbar ---- */
+  #taskbar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    background: linear-gradient(180deg,
+      #245edb 0%,
+      #3973e8 9%,
+      #3973e8 18%,
+      #2a5fde 92%,
+      #1941a5 100%);
+    border-top: 1px solid #0a4ec1;
+    z-index: 1000;
+  }
+  #start-button {
+    height: 28px;
+    padding: 0 18px 2px 32px;
+    margin-left: 1px;
+    background:
+      radial-gradient(circle at 12px 50%, #fff 2px, transparent 3px),
+      linear-gradient(180deg, #3da53b 0%, #379835 50%, #2c8a2a 100%);
+    color: #fff;
+    font-style: italic;
+    font-weight: bold;
+    font-size: 14px;
+    border: none;
+    border-radius: 0 12px 12px 0;
+    cursor: pointer;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+    position: relative;
+  }
+  #start-button::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    background:
+      linear-gradient(45deg, #d33 50%, transparent 50%) top left / 50% 50% no-repeat,
+      linear-gradient(-45deg, #fc3 50%, transparent 50%) top right / 50% 50% no-repeat,
+      linear-gradient(-45deg, #3c3 50%, transparent 50%) bottom left / 50% 50% no-repeat,
+      linear-gradient(45deg, #36f 50%, transparent 50%) bottom right / 50% 50% no-repeat;
+  }
+  #start-button:hover { filter: brightness(1.1); }
+  #start-button:active { filter: brightness(0.9); }
+
+  #taskbar-apps {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px;
+    overflow: hidden;
+  }
+  .taskbar-app {
+    height: 22px;
+    padding: 0 8px;
+    background: linear-gradient(180deg, #3982e6 0%, #1f5fc4 100%);
+    border: 1px solid #0a3d8a;
+    color: #fff;
+    font-size: 11px;
+    cursor: pointer;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 2px;
+  }
+  .taskbar-app.active {
+    background: linear-gradient(180deg, #1c4ea2 0%, #2362c2 100%);
+    box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  .taskbar-app:hover { filter: brightness(1.1); }
+
+  #tray {
+    height: 100%;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(180deg, #1391e3 0%, #0e7ac6 50%, #0e7ac6 100%);
+    border-left: 1px solid #0a4ec1;
+    color: #fff;
+    font-size: 11px;
+  }
+  #clock {
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  /* ---- Start menu ---- */
+  #start-menu {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    width: 280px;
+    background: #fff;
+    border: 1px solid #0a4ec1;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4);
+    z-index: 999;
+    display: none;
+    overflow: hidden;
+  }
+  #start-menu.open { display: block; }
+  #start-menu-header {
+    background: linear-gradient(180deg, #1573e6 0%, #1352a8 100%);
+    color: #fff;
+    padding: 10px 12px;
+    font-weight: bold;
+    border-bottom: 2px solid #f5a623;
+  }
+  #start-menu-items {
+    padding: 6px 0;
+  }
+  .start-item {
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .start-item:hover {
+    background: linear-gradient(180deg, #316ac5 0%, #1352a8 100%);
+    color: #fff;
+  }
+  .start-item .si-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  /* ---- App-specific styles ---- */
+  .app-section { padding: 4px; }
+
+  /* Restaurant app */
+  .restaurant-card {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    margin-bottom: 6px;
+    background: #fff;
+    border: 1px solid #919b9c;
+    cursor: pointer;
+  }
+  .restaurant-card:hover { background: #d4e1f5; }
+  .restaurant-card.chosen { background: #ffe8a3; border-color: #d49718; }
+  .restaurant-thumb {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #c0c0c0 0%, #808080 100%);
+    border: 1px solid #404040;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: bold;
+    font-size: 18px;
+  }
+  .restaurant-info { flex: 1; font-size: 12px; }
+  .restaurant-info .r-name { font-weight: bold; font-size: 13px; }
+  .restaurant-info .r-meta { color: #555; margin-top: 2px; }
+  .vote-bar {
+    margin-top: 4px;
+    height: 6px;
+    background: #e0e0e0;
+    border: 1px solid #999;
+    position: relative;
+  }
+  .vote-bar-fill {
+    height: 100%;
+    background: linear-gradient(180deg, #5fa8e8 0%, #2c6db8 100%);
+  }
+
+  /* Calendar app */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #919b9c;
+    border: 1px solid #919b9c;
+    margin-top: 6px;
+  }
+  .cal-head {
+    background: #ece9d8;
+    text-align: center;
+    padding: 4px 2px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .cal-day {
+    background: #fff;
+    min-height: 50px;
+    padding: 2px 4px;
+    font-size: 11px;
+    cursor: pointer;
+    position: relative;
+  }
+  .cal-day:hover { background: #fff8d1; }
+  .cal-day.other-month { background: #f0f0f0; color: #999; }
+  .cal-day.today { background: #d4e1f5; font-weight: bold; }
+  .cal-day .ev-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 2px;
+  }
+  .cal-event-list {
+    margin-top: 8px;
+    border: 1px inset #ece9d8;
+    background: #fff;
+    padding: 6px;
+    font-size: 12px;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .cal-event-list .ev-item {
+    padding: 3px 4px;
+    border-bottom: 1px dotted #ccc;
+  }
+  .cal-event-list .ev-item:last-child { border-bottom: none; }
+
+  /* Radio app */
+  .radio-display {
+    background: #1a1a1a;
+    color: #5fff5f;
+    font-family: 'Courier New', monospace;
+    padding: 10px;
+    border: 2px inset #808080;
+    margin-bottom: 8px;
+  }
+  .radio-display .station {
+    font-size: 11px;
+    opacity: 0.7;
+  }
+  .radio-display .now-playing {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 4px 0;
+  }
+  .radio-display .artist {
+    font-size: 12px;
+  }
+  .vu-meter {
+    display: flex;
+    gap: 2px;
+    margin-top: 6px;
+    height: 8px;
+  }
+  .vu-bar {
+    flex: 1;
+    background: #052905;
+    transition: background 0.1s;
+  }
+  .vu-bar.lit-low { background: #5fff5f; }
+  .vu-bar.lit-mid { background: #ffe05f; }
+  .vu-bar.lit-high { background: #ff5f5f; }
+  .radio-controls {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+  .radio-controls button {
+    min-width: 38px;
+  }
+  .radio-queue {
+    border: 1px inset #ece9d8;
+    background: #fff;
+    padding: 6px;
+    font-size: 12px;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+  .queue-item {
+    padding: 2px 4px;
+    border-bottom: 1px dotted #ddd;
+  }
+
+  /* Welcome app */
+  .welcome-content {
+    padding: 12px;
+    line-height: 1.5;
+    font-size: 13px;
+  }
+  .welcome-content h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+  .welcome-content ul {
+    margin: 6px 0;
+    padding-left: 22px;
+  }
+</style>
+</head>
+<body>
+<h2 class="sr-only" style="position:absolute;left:-9999px">WorkstationOS desktop with restaurant picker, calendar, and radio apps in draggable windows.</h2>
+
+<div id="desktop">
+  <div id="icon-grid" role="list"></div>
+  <div id="window-layer"></div>
+</div>
+
+<div id="start-menu" role="menu" aria-hidden="true">
+  <div id="start-menu-header">WorkstationOS</div>
+  <div id="start-menu-items"></div>
+</div>
+
+<div id="taskbar">
+  <button id="start-button" type="button" aria-haspopup="menu" aria-expanded="false">start</button>
+  <div id="taskbar-apps"></div>
+  <div id="tray">
+    <span id="speaker" title="Volume" style="cursor:pointer">🔊</span>
+    <div id="clock" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   App registry — each app declares an id, label, icon (SVG), and
+   a render function that fills the window body. Add an app by
+   appending to APPS.
+   ============================================================ */
+
+const APPS = [
+  {
+    id: 'welcome',
+    label: 'Welcome',
+    width: 460, height: 320,
+    icon: iconWelcome,
+    render: renderWelcome,
+    autoOpen: true
+  },
+  {
+    id: 'restaurants',
+    label: 'The Lunch',
+    width: 1024, height: 720,
+    icon: iconRestaurant,
+    // render: renderRestaurant
+    render: (body) => {
+      body.style.padding = '0';
+      body.innerHTML = `<iframe
+        src="https://sgarant.fr/main-quest.html"
+        style="width:100%;height:100%;border:0;display:block"
+        title="The Lunch"></iframe>`;
+    }
+  },
+  {
+    id: 'calendar',
+    label: 'Team Calendar',
+    width: 480, height: 420,
+    icon: iconCalendar,
+    render: renderCalendar
+  },
+  {
+    id: 'radio',
+    label: 'Web Radio',
+    width: 360, height: 340,
+    icon: iconRadio,
+    render: renderRadio
+  }
+];
+
+/* ============================================================
+   Window manager
+   ============================================================ */
+
+const windows = new Map(); // id -> { el, app, x, y, w, h, z, minimized }
+let zCounter = 10;
+let activeWindowId = null;
+
+function openApp(appId) {
+  const app = APPS.find(a => a.id === appId);
+  if (!app) return;
+  if (windows.has(appId)) {
+    const w = windows.get(appId);
+    w.minimized = false;
+    w.el.classList.remove('minimized');
+    focusWindow(appId);
+    return;
+  }
+  createWindow(app);
+}
+
+function createWindow(app) {
+  const layer = document.getElementById('window-layer');
+  const el = document.createElement('div');
+  el.className = 'os-window';
+  el.dataset.appId = app.id;
+
+  // Stagger initial position
+  const offset = windows.size * 24;
+  const x = 80 + offset;
+  const y = 60 + offset;
+
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.width = app.width + 'px';
+  el.style.height = app.height + 'px';
+
+  el.innerHTML = `
+    <div class="title-bar">
+      <div class="title-bar-text">${app.label}</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize" title="Minimize" data-action="minimize">_</button>
+        <button aria-label="Maximize" title="Maximize" data-action="maximize">▢</button>
+        <button aria-label="Close" title="Close" data-action="close">×</button>
+      </div>
+    </div>
+    <div class="window-body"></div>
+    <div class="resize-handle n"  data-resize="n"></div>
+    <div class="resize-handle s"  data-resize="s"></div>
+    <div class="resize-handle e"  data-resize="e"></div>
+    <div class="resize-handle w"  data-resize="w"></div>
+    <div class="resize-handle ne" data-resize="ne"></div>
+    <div class="resize-handle nw" data-resize="nw"></div>
+    <div class="resize-handle se" data-resize="se"></div>
+    <div class="resize-handle sw" data-resize="sw"></div>
+  `;
+
+  layer.appendChild(el);
+  const body = el.querySelector('.window-body');
+  app.render(body, app);
+
+  // Title-bar controls
+  el.querySelector('[data-action="close"]').addEventListener('click', e => {
+    e.stopPropagation(); closeWindow(app.id);
+  });
+  el.querySelector('[data-action="minimize"]').addEventListener('click', e => {
+    e.stopPropagation(); minimizeWindow(app.id);
+  });
+  el.querySelector('[data-action="maximize"]').addEventListener('click', e => {
+    e.stopPropagation(); toggleMaximize(app.id);
+  });
+
+  // Drag from title bar
+  const titleBar = el.querySelector('.title-bar');
+  titleBar.addEventListener('mousedown', e => beginDrag(e, app.id));
+  // Double-click title bar to maximize
+  titleBar.addEventListener('dblclick', e => {
+    if (!e.target.closest('.title-bar-controls')) toggleMaximize(app.id);
+  });
+
+  // Resize handles
+  el.querySelectorAll('.resize-handle').forEach(h => {
+    h.addEventListener('mousedown', e => beginResize(e, app.id, h.dataset.resize));
+  });
+
+  // Click anywhere on window to focus
+  el.addEventListener('mousedown', () => focusWindow(app.id));
+
+  windows.set(app.id, { el, app, minimized: false, maximized: false, prev: null });
+  focusWindow(app.id);
+  renderTaskbar();
+}
+
+function closeWindow(appId) {
+  const w = windows.get(appId);
+  if (!w) return;
+  w.el.remove();
+  windows.delete(appId);
+  if (activeWindowId === appId) activeWindowId = null;
+  renderTaskbar();
+}
+
+function minimizeWindow(appId) {
+  const w = windows.get(appId);
+  if (!w) return;
+  w.minimized = true;
+  w.el.classList.add('minimized');
+  if (activeWindowId === appId) activeWindowId = null;
+  renderTaskbar();
+}
+
+function toggleMaximize(appId) {
+  const w = windows.get(appId);
+  if (!w) return;
+  const maxBtn = w.el.querySelector('[data-action="maximize"]');
+  if (w.maximized) {
+    Object.assign(w.el.style, w.prev);
+    w.maximized = false;
+    w.el.classList.remove('maximized');
+    if (maxBtn) { maxBtn.textContent = '▢'; maxBtn.title = 'Maximize'; }
+  } else {
+    w.prev = {
+      left: w.el.style.left,
+      top: w.el.style.top,
+      width: w.el.style.width,
+      height: w.el.style.height
+    };
+    const taskbarH = 30;
+    Object.assign(w.el.style, {
+      left: '0px', top: '0px',
+      width: '100%',
+      height: (window.innerHeight - taskbarH) + 'px'
+    });
+    w.maximized = true;
+    w.el.classList.add('maximized');
+    if (maxBtn) { maxBtn.textContent = '❐'; maxBtn.title = 'Restore'; }
+  }
+}
+
+function focusWindow(appId) {
+  const w = windows.get(appId);
+  if (!w || w.minimized) return;
+  zCounter += 1;
+  w.el.style.zIndex = zCounter;
+  windows.forEach((other, id) => {
+    other.el.classList.toggle('inactive', id !== appId);
+  });
+  activeWindowId = appId;
+  renderTaskbar();
+}
+
+/* ---- Drag logic ---- */
+let drag = null;
+function beginDrag(e, appId) {
+  if (e.target.closest('.title-bar-controls')) return;
+  const w = windows.get(appId);
+  if (!w || w.maximized) return;
+  const rect = w.el.getBoundingClientRect();
+  drag = {
+    appId,
+    offsetX: e.clientX - rect.left,
+    offsetY: e.clientY - rect.top
+  };
+  e.preventDefault();
+}
+
+/* ---- Resize logic ---- */
+let resize = null;
+function beginResize(e, appId, edge) {
+  e.stopPropagation();
+  e.preventDefault();
+  const w = windows.get(appId);
+  if (!w || w.maximized) return;
+  focusWindow(appId);
+  const rect = w.el.getBoundingClientRect();
+  resize = {
+    appId, edge,
+    startX: e.clientX,
+    startY: e.clientY,
+    startLeft: rect.left,
+    startTop: rect.top,
+    startWidth: rect.width,
+    startHeight: rect.height
+  };
+  // Pin the cursor across the whole document during the drag
+  document.body.style.cursor = getComputedStyle(e.currentTarget).cursor;
+}
+
+document.addEventListener('mousemove', e => {
+  if (drag) {
+    const w = windows.get(drag.appId);
+    if (!w) return;
+    const x = Math.max(0, Math.min(window.innerWidth - 80, e.clientX - drag.offsetX));
+    const y = Math.max(0, Math.min(window.innerHeight - 60, e.clientY - drag.offsetY));
+    w.el.style.left = x + 'px';
+    w.el.style.top = y + 'px';
+    return;
+  }
+  if (resize) {
+    const w = windows.get(resize.appId);
+    if (!w) return;
+    const dx = e.clientX - resize.startX;
+    const dy = e.clientY - resize.startY;
+    const minW = 280, minH = 180;
+    let { startLeft: L, startTop: T, startWidth: W, startHeight: H } = resize;
+    let newL = L, newT = T, newW = W, newH = H;
+    const edge = resize.edge;
+
+    if (edge.includes('e')) newW = Math.max(minW, W + dx);
+    if (edge.includes('s')) newH = Math.max(minH, H + dy);
+    if (edge.includes('w')) {
+      newW = Math.max(minW, W - dx);
+      newL = L + (W - newW);
+    }
+    if (edge.includes('n')) {
+      newH = Math.max(minH, H - dy);
+      newT = T + (H - newH);
+    }
+
+    // Keep within viewport
+    if (newL < 0) { newW += newL; newL = 0; }
+    if (newT < 0) { newH += newT; newT = 0; }
+    const maxW = window.innerWidth - newL;
+    const maxH = window.innerHeight - 30 - newT; // taskbar
+    if (newW > maxW) newW = maxW;
+    if (newH > maxH) newH = maxH;
+
+    w.el.style.left = newL + 'px';
+    w.el.style.top = newT + 'px';
+    w.el.style.width = newW + 'px';
+    w.el.style.height = newH + 'px';
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  drag = null;
+  if (resize) {
+    document.body.style.cursor = '';
+    resize = null;
+  }
+});
+
+/* ============================================================
+   Desktop icons
+   ============================================================ */
+
+function renderDesktopIcons() {
+  const grid = document.getElementById('icon-grid');
+  grid.innerHTML = '';
+  APPS.forEach(app => {
+    const div = document.createElement('div');
+    div.className = 'desktop-icon';
+    div.tabIndex = 0;
+    div.setAttribute('role', 'listitem');
+    div.dataset.appId = app.id;
+    div.innerHTML = `<div class="icon-art">${app.icon()}</div><div class="icon-label">${app.label}</div>`;
+    div.addEventListener('click', () => {
+      document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+      div.classList.add('selected');
+    });
+    div.addEventListener('dblclick', () => openApp(app.id));
+    div.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openApp(app.id); }
+    });
+    grid.appendChild(div);
+  });
+}
+
+document.getElementById('desktop').addEventListener('mousedown', e => {
+  if (e.target.id === 'desktop' || e.target.id === 'icon-grid') {
+    document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+    closeStartMenu();
+  }
+});
+
+/* ============================================================
+   Taskbar + Start menu
+   ============================================================ */
+
+function renderTaskbar() {
+  const bar = document.getElementById('taskbar-apps');
+  bar.innerHTML = '';
+  windows.forEach((w, id) => {
+    const btn = document.createElement('button');
+    btn.className = 'taskbar-app' + (activeWindowId === id && !w.minimized ? ' active' : '');
+    btn.textContent = w.app.label;
+    btn.title = w.app.label;
+    btn.addEventListener('click', () => {
+      if (w.minimized) {
+        w.minimized = false;
+        w.el.classList.remove('minimized');
+        focusWindow(id);
+      } else if (activeWindowId === id) {
+        minimizeWindow(id);
+      } else {
+        focusWindow(id);
+      }
+    });
+    bar.appendChild(btn);
+  });
+}
+
+function renderStartMenu() {
+  const items = document.getElementById('start-menu-items');
+  items.innerHTML = '';
+  APPS.forEach(app => {
+    const it = document.createElement('div');
+    it.className = 'start-item';
+    it.setAttribute('role', 'menuitem');
+    it.tabIndex = 0;
+    it.innerHTML = `<span class="si-icon">${app.icon()}</span><span>${app.label}</span>`;
+    it.addEventListener('click', () => { openApp(app.id); closeStartMenu(); });
+    items.appendChild(it);
+  });
+}
+
+const startBtn = document.getElementById('start-button');
+const startMenu = document.getElementById('start-menu');
+startBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  startMenu.classList.toggle('open');
+  const open = startMenu.classList.contains('open');
+  startBtn.setAttribute('aria-expanded', open);
+  startMenu.setAttribute('aria-hidden', !open);
+});
+function closeStartMenu() {
+  startMenu.classList.remove('open');
+  startBtn.setAttribute('aria-expanded', 'false');
+  startMenu.setAttribute('aria-hidden', 'true');
+}
+document.addEventListener('click', e => {
+  if (!startMenu.contains(e.target) && e.target !== startBtn) closeStartMenu();
+});
+
+/* ---- Clock ---- */
+function tickClock() {
+  const now = new Date();
+  const h = now.getHours();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = ((h + 11) % 12) + 1;
+  document.getElementById('clock').innerHTML = `${h12}:${m} ${ampm}`;
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+/* ============================================================
+   Icon SVGs (all inline, no external assets)
+   ============================================================ */
+
+function iconWelcome() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="6" width="24" height="20" fill="#fff" stroke="#000" stroke-width="1"/>
+    <rect x="4" y="6" width="24" height="4" fill="#0a4ec1" stroke="#000" stroke-width="1"/>
+    <line x1="7" y1="14" x2="25" y2="14" stroke="#666" stroke-width="1"/>
+    <line x1="7" y1="18" x2="25" y2="18" stroke="#666" stroke-width="1"/>
+    <line x1="7" y1="22" x2="20" y2="22" stroke="#666" stroke-width="1"/>
+  </svg>`;
+}
+function iconRestaurant() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <rect x="6" y="4" width="20" height="24" fill="#f5d77f" stroke="#8b5a00" stroke-width="1"/>
+    <rect x="9" y="8" width="14" height="2" fill="#8b5a00"/>
+    <circle cx="12" cy="16" r="3" fill="#cc3333" stroke="#8b0000" stroke-width="1"/>
+    <circle cx="20" cy="16" r="3" fill="#33aa33" stroke="#005500" stroke-width="1"/>
+    <rect x="9" y="22" width="14" height="2" fill="#8b5a00"/>
+  </svg>`;
+}
+function iconCalendar() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="6" width="24" height="22" fill="#fff" stroke="#000" stroke-width="1"/>
+    <rect x="4" y="6" width="24" height="6" fill="#cc2222" stroke="#000" stroke-width="1"/>
+    <rect x="8" y="3" width="2" height="6" fill="#444"/>
+    <rect x="22" y="3" width="2" height="6" fill="#444"/>
+    <text x="16" y="22" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="10" fill="#000" font-weight="bold">23</text>
+  </svg>`;
+}
+function iconRadio() {
+  return `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="10" width="26" height="16" fill="#888" stroke="#000" stroke-width="1"/>
+    <circle cx="10" cy="18" r="4" fill="#222" stroke="#000" stroke-width="1"/>
+    <circle cx="10" cy="18" r="1.5" fill="#5fff5f"/>
+    <rect x="16" y="14" width="11" height="3" fill="#333"/>
+    <rect x="16" y="19" width="11" height="3" fill="#333"/>
+    <line x1="20" y1="10" x2="26" y2="4" stroke="#444" stroke-width="1"/>
+    <circle cx="26" cy="4" r="1.5" fill="#cc3333"/>
+  </svg>`;
+}
+
+/* ============================================================
+   App: Welcome
+   ============================================================ */
+function renderWelcome(body, app) {
+  body.innerHTML = `
+    <div class="welcome-content">
+      <h2>Welcome to WorkstationOS</h2>
+      <p>This is the landing page for our team's internal apps. Double-click an icon on the desktop to open an app, or use the <b>start</b> menu.</p>
+      <ul>
+        <li><b>Lunch Picker</b> — browse restaurants near the office and vote</li>
+        <li><b>Team Calendar</b> — upcoming team events</li>
+        <li><b>Web Radio</b> — what's playing right now, request a track, skip</li>
+      </ul>
+      <p style="margin-top:14px"><i>Tip: try minimizing, maximizing, dragging windows around, and stacking them.</i></p>
+      <div style="text-align:right;margin-top:14px">
+        <button onclick="closeWindow('welcome')">OK</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   App: Restaurants — stub data, swap with your real backend
+   ============================================================ */
+const RESTAURANT_DATA = [
+  { id: 1, name: "Chez Marcel",     cuisine: "French bistro",  walk: 4,  votes: 7, initials: "CM" },
+  { id: 2, name: "Sakura Ramen",    cuisine: "Japanese",       walk: 7,  votes: 5, initials: "SR" },
+  { id: 3, name: "La Bella Pasta",  cuisine: "Italian",        walk: 3,  votes: 4, initials: "LB" },
+  { id: 4, name: "Green Bowl",      cuisine: "Salads & poké",  walk: 5,  votes: 9, initials: "GB" },
+  { id: 5, name: "El Tacopolis",    cuisine: "Mexican",        walk: 8,  votes: 3, initials: "ET" },
+  { id: 6, name: "Burger Atelier",  cuisine: "Burgers",        walk: 6,  votes: 6, initials: "BA" }
+];
+function renderRestaurants(body) {
+  const maxVotes = Math.max(...RESTAURANT_DATA.map(r => r.votes));
+  const list = RESTAURANT_DATA.map(r => `
+    <div class="restaurant-card" data-id="${r.id}">
+      <div class="restaurant-thumb">${r.initials}</div>
+      <div class="restaurant-info">
+        <div class="r-name">${r.name}</div>
+        <div class="r-meta">${r.cuisine} &middot; ${r.walk} min walk</div>
+        <div class="vote-bar"><div class="vote-bar-fill" style="width:${(r.votes / maxVotes) * 100}%"></div></div>
+        <div class="r-meta"><span class="vote-count">${r.votes}</span> votes today</div>
+      </div>
+    </div>
+  `).join('');
+
+  body.innerHTML = `
+    <div class="app-section">
+      <fieldset style="margin-bottom:8px">
+        <legend>Today's lunch</legend>
+        <div style="font-size:12px;padding:2px 0">Click a restaurant to vote. Top vote becomes today's pick.</div>
+      </fieldset>
+      <div id="restaurant-list">${list}</div>
+      <div style="margin-top:8px;text-align:right">
+        <button id="r-pick-top">Pick top vote</button>
+      </div>
+      <div id="r-status" style="margin-top:6px;font-size:12px;font-style:italic"></div>
+    </div>
+  `;
+
+  body.querySelectorAll('.restaurant-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = parseInt(card.dataset.id, 10);
+      const r = RESTAURANT_DATA.find(x => x.id === id);
+      r.votes += 1;
+      renderRestaurants(body); // re-render
+    });
+  });
+
+  body.querySelector('#r-pick-top').addEventListener('click', () => {
+    const top = [...RESTAURANT_DATA].sort((a, b) => b.votes - a.votes)[0];
+    body.querySelectorAll('.restaurant-card').forEach(c => {
+      c.classList.toggle('chosen', parseInt(c.dataset.id, 10) === top.id);
+    });
+    body.querySelector('#r-status').textContent = `Today's lunch: ${top.name}`;
+  });
+}
+
+/* ============================================================
+   App: Calendar — stub events, swap with your real backend
+   ============================================================ */
+const CAL_EVENTS = (() => {
+  const today = new Date();
+  const y = today.getFullYear(), m = today.getMonth();
+  return [
+    { date: new Date(y, m, today.getDate()),       title: "Team standup",        color: "#3973e8" },
+    { date: new Date(y, m, today.getDate() + 2),   title: "Product demo day",    color: "#3da53b" },
+    { date: new Date(y, m, today.getDate() + 5),   title: "Quarterly planning",  color: "#f5a623" },
+    { date: new Date(y, m, today.getDate() + 8),   title: "Office party",        color: "#cc3366" },
+    { date: new Date(y, m, today.getDate() + 12),  title: "Hack day",            color: "#7a3eb1" }
+  ];
+})();
+function renderCalendar(body) {
+  const today = new Date();
+  let viewY = today.getFullYear(), viewM = today.getMonth();
+
+  function draw() {
+    const first = new Date(viewY, viewM, 1);
+    const startWeekday = (first.getDay() + 6) % 7; // Monday-first
+    const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+    const monthName = first.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    let cells = '';
+    const headers = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    headers.forEach(h => cells += `<div class="cal-head">${h}</div>`);
+
+    // leading blanks from prev month
+    for (let i = 0; i < startWeekday; i++) {
+      cells += `<div class="cal-day other-month"></div>`;
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(viewY, viewM, d);
+      const isToday = dt.toDateString() === today.toDateString();
+      const evs = CAL_EVENTS.filter(e =>
+        e.date.getFullYear() === viewY &&
+        e.date.getMonth() === viewM &&
+        e.date.getDate() === d
+      );
+      const dots = evs.map(e => `<span class="ev-dot" style="background:${e.color}"></span>`).join('');
+      cells += `<div class="cal-day${isToday ? ' today' : ''}" data-d="${d}">
+        <div>${d}</div>${dots}
+      </div>`;
+    }
+
+    body.innerHTML = `
+      <div class="app-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <button id="cal-prev">&laquo;</button>
+          <strong style="text-transform:capitalize">${monthName}</strong>
+          <button id="cal-next">&raquo;</button>
+        </div>
+        <div class="cal-grid">${cells}</div>
+        <div class="cal-event-list" id="cal-events"></div>
+      </div>
+    `;
+
+    const list = body.querySelector('#cal-events');
+    const upcoming = CAL_EVENTS
+      .filter(e => e.date >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))
+      .sort((a, b) => a.date - b.date)
+      .slice(0, 6);
+    list.innerHTML = upcoming.length
+      ? upcoming.map(e => `
+        <div class="ev-item">
+          <span class="ev-dot" style="background:${e.color}"></span>
+          <b>${e.date.toLocaleDateString('default', { month: 'short', day: 'numeric' })}</b>
+          &mdash; ${e.title}
+        </div>`).join('')
+      : '<i>No upcoming events.</i>';
+
+    body.querySelector('#cal-prev').addEventListener('click', () => {
+      viewM -= 1; if (viewM < 0) { viewM = 11; viewY -= 1; }
+      draw();
+    });
+    body.querySelector('#cal-next').addEventListener('click', () => {
+      viewM += 1; if (viewM > 11) { viewM = 0; viewY += 1; }
+      draw();
+    });
+  }
+  draw();
+}
+
+/* ============================================================
+   App: Radio — stub player, swap with your real stream
+   ============================================================ */
+const RADIO_QUEUE = [
+  { artist: "Daft Punk",        title: "Around the World" },
+  { artist: "Air",              title: "La Femme d'Argent" },
+  { artist: "Stereolab",        title: "Ping Pong" },
+  { artist: "Phoenix",          title: "1901" },
+  { artist: "Justice",          title: "D.A.N.C.E." }
+];
+let radioIdx = 0;
+let radioPlaying = false;
+let vuTimer = null;
+
+function renderRadio(body) {
+  body.innerHTML = `
+    <div class="app-section">
+      <div class="radio-display">
+        <div class="station">📻 OFFICE FM &middot; 89.7</div>
+        <div class="now-playing" id="rd-title">—</div>
+        <div class="artist" id="rd-artist">paused</div>
+        <div class="vu-meter" id="vu-meter">
+          ${Array.from({length: 18}).map(() => '<div class="vu-bar"></div>').join('')}
+        </div>
+      </div>
+      <div class="radio-controls">
+        <button id="rd-prev" title="Previous">⏮</button>
+        <button id="rd-play" title="Play/Pause">▶</button>
+        <button id="rd-skip" title="Skip">⏭</button>
+        <button id="rd-request" title="Request a track">+ Request</button>
+      </div>
+      <fieldset>
+        <legend>Up next</legend>
+        <div class="radio-queue" id="rd-queue"></div>
+      </fieldset>
+    </div>
+  `;
+
+  const titleEl = body.querySelector('#rd-title');
+  const artistEl = body.querySelector('#rd-artist');
+  const playBtn = body.querySelector('#rd-play');
+  const queueEl = body.querySelector('#rd-queue');
+  const meterBars = body.querySelectorAll('.vu-bar');
+
+  function paint() {
+    const t = RADIO_QUEUE[radioIdx];
+    titleEl.textContent = t.title;
+    artistEl.textContent = radioPlaying ? t.artist : 'paused';
+    playBtn.textContent = radioPlaying ? '⏸' : '▶';
+    queueEl.innerHTML = RADIO_QUEUE
+      .map((q, i) => `<div class="queue-item">${i === radioIdx ? '▶ ' : '&nbsp;&nbsp;&nbsp;'}${q.artist} &mdash; ${q.title}</div>`)
+      .join('');
+  }
+
+  function startVU() {
+    stopVU();
+    vuTimer = setInterval(() => {
+      const lit = Math.floor(Math.random() * meterBars.length);
+      meterBars.forEach((b, i) => {
+        b.className = 'vu-bar';
+        if (i < lit) {
+          if (i < meterBars.length * 0.6) b.classList.add('lit-low');
+          else if (i < meterBars.length * 0.85) b.classList.add('lit-mid');
+          else b.classList.add('lit-high');
+        }
+      });
+    }, 120);
+  }
+  function stopVU() {
+    if (vuTimer) clearInterval(vuTimer);
+    vuTimer = null;
+    meterBars.forEach(b => b.className = 'vu-bar');
+  }
+
+  playBtn.addEventListener('click', () => {
+    radioPlaying = !radioPlaying;
+    if (radioPlaying) startVU(); else stopVU();
+    paint();
+  });
+  body.querySelector('#rd-skip').addEventListener('click', () => {
+    radioIdx = (radioIdx + 1) % RADIO_QUEUE.length; paint();
+  });
+  body.querySelector('#rd-prev').addEventListener('click', () => {
+    radioIdx = (radioIdx - 1 + RADIO_QUEUE.length) % RADIO_QUEUE.length; paint();
+  });
+  body.querySelector('#rd-request').addEventListener('click', () => {
+    const q = prompt('Request a track (artist — title):');
+    if (q && q.trim()) {
+      const [a, t] = q.split('—').map(s => (s || '').trim());
+      RADIO_QUEUE.push({ artist: a || 'Unknown', title: t || q });
+      paint();
+    }
+  });
+
+  paint();
+  if (radioPlaying) startVU();
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+renderDesktopIcons();
+renderStartMenu();
+
+// Auto-open welcome window on boot
+APPS.filter(a => a.autoOpen).forEach(a => openApp(a.id));
+</script>
+</body>
+</html>
